@@ -76,9 +76,13 @@ docker run -d -p 8000:8000 --name signal-vs-noise-container signal-vs-noise
 ## API Endpoints
 
 - `GET /` - Serve the main HTML interface
-- `GET /tasks/{column}` - Get tasks for signal/noise columns
-- `POST /tasks/{column}` - Add new task
-- `PUT /tasks/{column}/{task_id}` - Edit task text
-- `PUT /tasks/{column}/{task_id}/complete` - Toggle task completion
-- `DELETE /tasks/{column}/{task_id}` - Delete task
-- `GET /tasks/stats` - Get task statistics for progress bar
+- `GET /tasks/column/{column}` - Get tasks for signal/noise columns
+- `POST /tasks/column/{column}` - Add new task
+- `PUT /tasks/column/{task_id}` - Edit task text
+- `PUT /tasks/column/{column}/{task_id}/complete` - Toggle task completion
+- `PUT /tasks/column/{column}/{task_id}/ignore` - Toggle task ignore status
+- `DELETE /tasks/column/{column}/{task_id}` - Delete task
+- `POST /tasks/save` - Save tasks to local file
+- `POST /tasks/load` - Load tasks from local file
+- `POST /tasks/clear` - Clear all data
+- `PUT /tasks/bulk-update` - Bulk update tasks
