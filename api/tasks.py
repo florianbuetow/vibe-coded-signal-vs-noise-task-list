@@ -7,25 +7,6 @@ import uuid
 router = APIRouter()
 
 
-# Define the /stats endpoint first to ensure it's matched before the dynamic /{column} path
-@router.get("/stats")
-async def get_stats_api():
-    """
-    Returns the task counts for the progress bar calculation.
-    Only counts non-ignored tasks for the ratio.
-    This endpoint is accessed via /tasks/stats due to the router prefix.
-    """
-    print("FastAPI: /tasks/stats endpoint hit!")  # Added for debugging
-    
-    # Count only non-ignored tasks (handle backward compatibility)
-    signal_count = len([task for task in db.in_memory_db.databases["signal"] if not getattr(task, 'ignored', False)])
-    noise_count = len([task for task in db.in_memory_db.databases["noise"] if not getattr(task, 'ignored', False)])
-    
-    return {
-        "signal_count": signal_count,
-        "noise_count": noise_count,
-    }
-
 
 @router.post("/save")
 async def save_to_file_api():

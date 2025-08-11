@@ -14,9 +14,22 @@ static_dir = "static"
 if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 
-# Mount static files
-# This tells FastAPI to serve files from the 'static' directory under the '/static' URL path.
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+# Create a custom StaticFiles class with no-cache headers
+from fastapi.staticfiles import StaticFiles
+from fastapi import Request
+from fastapi.responses import FileResponse
+import time
+
+class NoCacheStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs) -> FileResponse:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache" 
+        response.headers["Expires"] = "0"
+        return response
+
+# Mount static files with no-cache headers
+app.mount("/static", NoCacheStaticFiles(directory=static_dir), name="static")
 
 # Include the tasks router
 # All routes defined in tasks_router will be prefixed with "/tasks".
@@ -88,7 +101,7 @@ async def read_root():
         </div>
     </div>
 
-    <script src="/static/script.js"></script>
+    <script src="/static/script.js?v={int(time.time())}"></script>
 </body>
 </html>
                     """)
@@ -668,43 +681,38 @@ async function toggleTaskCompleted(taskId, column, isCompleted) {
  */
 async function updateProgressBar() {
     try {
-        // Fetch task counts from the /tasks/stats endpoint
-        const response = await fetch(`${API_URL}/tasks/stats`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const stats = await response.json();
-
-        const totalTasks = stats.signal_count + stats.noise_count;
-        const progressBar = document.getElementById('progress-bar');
-        const progressLabel = document.getElementById('progress-label');
-
-        if (totalTasks === 0) {
-            progressBar.style.width = '0%';
-            progressLabel.textContent = 'Signal: 0% | Noise: 0%';
-            progressBar.className = 'progress-bar-fill'; // Neutral state
-            return;
-        }
-
-        const signalPercentage = Math.round((stats.signal_count / totalTasks) * 100);
-        const noisePercentage = 100 - signalPercentage;
-
-        progressBar.style.width = `${signalPercentage}%`;
-        progressLabel.textContent = `Signal: ${signalPercentage}% | Noise: ${noisePercentage}%`;
-
-        // Apply color based on the specified conditions
-        if (noisePercentage > 20) {
-            progressBar.className = 'progress-bar-fill red'; // Red if Noise > 20%
-        } else if (signalPercentage >= 80) {
-            progressBar.className = 'progress-bar-fill green'; // Green if Signal >= 80%
+        // Get current data from localStorage or fetch from API
+        const localData = loadFromLocalStorage();
+        if (localData && localData.signal && localData.noise) {
+            updateProgressBarFromData(localData);
         } else {
-            progressBar.className = 'progress-bar-fill'; // Default/neutral color for other ratios
+            // Fallback: fetch current data from API
+            const signalResponse = await fetch(`${API_URL}/tasks/column/signal`);
+            const noiseResponse = await fetch(`${API_URL}/tasks/column/noise`);
+            
+            if (signalResponse.ok && noiseResponse.ok) {
+                const signalData = await signalResponse.json();
+                const noiseData = await noiseResponse.json();
+                const data = {
+                    signal: signalData.tasks,
+                    noise: noiseData.tasks
+                };
+                updateProgressBarFromData(data);
+            } else {
+                throw new Error('Failed to fetch task data');
+            }
         }
     } catch (error) {
-        console.error("Error updating progress bar:", error);
-        // Optionally, display an error message to the user
+        console.error('Error updating progress bar:', error);
+        // Fallback to a neutral state if data can't be loaded
+        const progressBar = document.getElementById('progress-bar');
+        const progressLabel = document.getElementById('progress-label');
+        progressBar.style.width = '0%';
+        progressLabel.textContent = 'Error loading stats';
+        progressBar.className = 'progress-bar-fill';
     }
 }
+
                     """)
 
     # Open index.html and return its content
@@ -712,4 +720,4 @@ async function updateProgressBar() {
         return HTMLResponse(content=f.read())
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
